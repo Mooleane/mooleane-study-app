@@ -785,34 +785,63 @@ function BreakdownWizardTab({
       <div className="mb-3 text-sm font-semibold text-zinc-900">
         Assignment Details
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          className="h-9 w-56 rounded border border-zinc-300 bg-white px-2 text-sm text-zinc-800"
-          placeholder="Task Name"
-          aria-label="Task Name"
-          value={taskName}
-          onChange={(e) => onChangeTaskName(e.target.value)}
-        />
-        <input
-          className="h-9 w-40 rounded border border-zinc-300 bg-white px-2 text-sm text-zinc-800"
-          type="date"
-          aria-label="Task Date"
-          value={taskDate}
-          onChange={(e) => onChangeTaskDate(e.target.value)}
-        />
-        <select
-          className="h-9 w-48 rounded border border-zinc-300 bg-white px-2 text-sm text-zinc-800"
-          value={priority}
-          onChange={(e) => onChangePriority(e.target.value)}
-          aria-label="Priority"
-        >
-          <option value="" disabled>
-            Priority
-          </option>
-          <option>Low</option>
-          <option>Medium</option>
-          <option>High</option>
-        </select>
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="flex flex-col">
+          <label
+            htmlFor="assignment-name"
+            className="mb-1 text-[11px] text-zinc-700"
+          >
+            Assignment name
+          </label>
+          <input
+            id="assignment-name"
+            className="h-9 w-56 rounded border border-zinc-300 bg-white px-2 text-sm text-zinc-800"
+            placeholder="Assignment name"
+            aria-label="Assignment Name"
+            value={taskName}
+            onChange={(e) => onChangeTaskName(e.target.value)}
+          />
+        </div>
+
+        <div className="flex flex-col">
+          <label
+            htmlFor="assignment-date"
+            className="mb-1 text-[11px] text-zinc-700"
+          >
+            Assignment date
+          </label>
+          <input
+            id="assignment-date"
+            className="h-9 w-40 rounded border border-zinc-300 bg-white px-2 text-sm text-zinc-800"
+            type="date"
+            aria-label="Assignment Date"
+            value={taskDate}
+            onChange={(e) => onChangeTaskDate(e.target.value)}
+          />
+        </div>
+
+        <div className="flex flex-col">
+          <label
+            htmlFor="assignment-priority"
+            className="mb-1 text-[11px] text-zinc-700"
+          >
+            Assignment priority
+          </label>
+          <select
+            id="assignment-priority"
+            className="h-9 w-48 rounded border border-zinc-300 bg-white px-2 text-sm text-zinc-800"
+            value={priority}
+            onChange={(e) => onChangePriority(e.target.value)}
+            aria-label="Assignment Priority"
+          >
+            <option value="" disabled>
+              Priority
+            </option>
+            <option>Low</option>
+            <option>Medium</option>
+            <option>High</option>
+          </select>
+        </div>
       </div>
 
       <div className="rounded border border-zinc-300 bg-white p-8">
@@ -872,7 +901,7 @@ function BreakdownWizardTab({
             title={
               taskName.trim()
                 ? "Generate steps using AI"
-                : "Enter a task name first"
+                : "Enter an assignment name first"
             }
           >
             {isGenerating ? "Generating…" : "Generate"}
@@ -1007,30 +1036,48 @@ function MoodTrackerTab({
         Record Mood
       </div>
       <div className="rounded border border-zinc-300 bg-white p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            className="h-9 w-40 rounded border border-zinc-300 bg-white px-2 text-sm text-zinc-800"
-            value={selectedMood}
-            onChange={(e) => setSelectedMood(e.target.value)}
-            aria-label="Select Mood"
-          >
-            <option value="" disabled>
-              Select Mood
-            </option>
-            <option>Great</option>
-            <option>Good</option>
-            <option>Neutral</option>
-            <option>Stressed</option>
-            <option>Overwhelmed</option>
-          </select>
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="flex flex-col">
+            <label
+              htmlFor="mood-select"
+              className="mb-1 text-[11px] text-zinc-700"
+            >
+              Mood
+            </label>
+            <select
+              id="mood-select"
+              className="h-9 w-40 rounded border border-zinc-300 bg-white px-2 text-sm text-zinc-800"
+              value={selectedMood}
+              onChange={(e) => setSelectedMood(e.target.value)}
+              aria-label="Mood"
+            >
+              <option value="" disabled>
+                Select Mood
+              </option>
+              <option>Great</option>
+              <option>Good</option>
+              <option>Neutral</option>
+              <option>Stressed</option>
+              <option>Overwhelmed</option>
+            </select>
+          </div>
 
-          <input
-            className="h-9 w-72 rounded border border-zinc-300 bg-white px-2 text-sm text-zinc-800"
-            placeholder="Extra Notes"
-            aria-label="Extra Notes"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-          />
+          <div className="flex flex-col">
+            <label
+              htmlFor="mood-notes"
+              className="mb-1 text-[11px] text-zinc-700"
+            >
+              Notes
+            </label>
+            <input
+              id="mood-notes"
+              className="h-9 w-72 rounded border border-zinc-300 bg-white px-2 text-sm text-zinc-800"
+              placeholder="Extra Notes"
+              aria-label="Notes"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </div>
 
           <button
             type="button"
