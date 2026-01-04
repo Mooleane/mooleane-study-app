@@ -5,7 +5,7 @@ const NAV_ITEMS = [
   { label: "About", href: "/about" },
   { label: "Why MyTime?", href: "/why-mytime" },
   { label: "Key Features", href: "/key-features" },
-  { label: "Dashboard", href: "#" },
+  { label: "Dashboard", href: "/dashboard" },
   { label: "Built Evidence", href: "#" },
   { label: "Reflection", href: "#" },
 ];
