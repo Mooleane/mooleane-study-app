@@ -71,6 +71,7 @@ function StudyPlannerTab() {
 
   return (
     <div className="space-y-6">
+      <div className="mb-3 text-sm font-semibold text-zinc-900">Schedule</div>
       <div className="space-y-2">
         {sessions.map((s) => (
           <div
