@@ -22,7 +22,7 @@ export default function WhyMyTimePage() {
               <section className="mt-8">
                 <h2 className="font-semibold text-zinc-900">The Solution</h2>
                 <p className="mt-2">
-                  MyTime combines time management, planning, and self care into an
+                  MyTime combines time management, planning, self care, and note-taking into an
                   all-in-one toolkit.
                 </p>
               </section>

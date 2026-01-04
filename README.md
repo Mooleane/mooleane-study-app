@@ -1,4 +1,4 @@
-# Mooleane Study Skills App / MyTime
+# Study App / MyTime
 
 ## Project overview
 MyTime is an all-in-one study-skills app that combines time management, planning, and self-care check-ins. It helps students block out time for tasks, break assignments into manageable steps, and reflect on mood/work patterns so they can adjust their routine without getting overwhelmed. The app uses Google sign-in and server-side AI endpoints to generate structured planning and reflection guidance.
