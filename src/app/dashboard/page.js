@@ -694,12 +694,51 @@ function StudyPlannerTab({
 }
 
 function BreakdownWizardTab() {
-  const steps = [
+  const defaultSteps = [
     "Research context (30m)",
     "Outline key points (20m)",
     "Draft introduction (45m)",
     "First revision (30m)",
   ];
+
+  const [taskName, setTaskName] = React.useState("");
+  const [taskDate, setTaskDate] = React.useState("");
+  const [priority, setPriority] = React.useState("");
+  const [steps, setSteps] = React.useState(defaultSteps);
+  const [isGenerating, setIsGenerating] = React.useState(false);
+  const [generateError, setGenerateError] = React.useState("");
+
+  async function generateSuggestedSteps() {
+    const trimmedName = taskName.trim();
+    if (!trimmedName) return;
+
+    setIsGenerating(true);
+    setGenerateError("");
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          taskName: trimmedName,
+          taskDate: taskDate.trim(),
+          priority: priority.trim(),
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to generate steps.");
+      }
+
+      const nextSteps = Array.isArray(data?.steps) ? data.steps : [];
+      setSteps(nextSteps.length > 0 ? nextSteps : defaultSteps);
+    } catch (e) {
+      setGenerateError(e?.message || "Failed to generate steps.");
+    } finally {
+      setIsGenerating(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -711,15 +750,20 @@ function BreakdownWizardTab() {
           className="h-9 w-56 rounded border border-zinc-300 bg-white px-2 text-sm text-zinc-800"
           placeholder="Task Name"
           aria-label="Task Name"
+          value={taskName}
+          onChange={(e) => setTaskName(e.target.value)}
         />
         <input
           className="h-9 w-40 rounded border border-zinc-300 bg-white px-2 text-sm text-zinc-800"
           type="date"
           aria-label="Task Date"
+          value={taskDate}
+          onChange={(e) => setTaskDate(e.target.value)}
         />
         <select
           className="h-9 w-48 rounded border border-zinc-300 bg-white px-2 text-sm text-zinc-800"
-          defaultValue=""
+          value={priority}
+          onChange={(e) => setPriority(e.target.value)}
           aria-label="Priority"
         >
           <option value="" disabled>
@@ -740,7 +784,34 @@ function BreakdownWizardTab() {
       <hr className="border-zinc-300" />
 
       <div>
-        <div className="text-sm font-semibold text-zinc-900">Suggested Steps</div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="text-sm font-semibold text-zinc-900">
+            Suggested Steps
+          </div>
+          <button
+            type="button"
+            className={
+              "rounded border border-zinc-400 bg-white px-4 py-2 text-xs font-medium " +
+              (taskName.trim() && !isGenerating
+                ? "text-zinc-800"
+                : "text-zinc-400")
+            }
+            onClick={generateSuggestedSteps}
+            disabled={!taskName.trim() || isGenerating}
+            aria-disabled={!taskName.trim() || isGenerating}
+            title={
+              taskName.trim()
+                ? "Generate steps using AI"
+                : "Enter a task name first"
+            }
+          >
+            {isGenerating ? "Generating…" : "Generate"}
+          </button>
+        </div>
+
+        {generateError ? (
+          <div className="mt-2 text-xs text-zinc-700">{generateError}</div>
+        ) : null}
         <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-zinc-800">
           {steps.map((s) => (
             <li key={s}>{s}</li>
@@ -779,23 +850,51 @@ function BreakdownWizardTab() {
 }
 
 function MoodTrackerTab() {
-  const timeline = [
-    {
-      date: "Mon Jan 05",
-      mood: "Neutral",
-      note: "The day is starting out okay.",
-    },
-    {
-      date: "Sun Jan 04",
-      mood: "Good",
-      note: "I had a fun evening.",
-    },
-    {
-      date: "Sat Jan 03",
-      mood: "Good",
-      note: "It was relaxing today.",
-    },
-  ];
+  const [selectedMood, setSelectedMood] = React.useState("");
+  const [note, setNote] = React.useState("");
+  const [timeline, setTimeline] = React.useState(() => {
+    if (typeof window === "undefined") return [];
+    const stored = safeParseJson(
+      window.localStorage.getItem("mytime.moods"),
+      []
+    );
+    return Array.isArray(stored) ? stored : [];
+  });
+
+  React.useEffect(() => {
+    try {
+      window.localStorage.setItem("mytime.moods", JSON.stringify(timeline));
+    } catch {
+      // ignore
+    }
+  }, [timeline]);
+
+  function recordMood() {
+    const mood = selectedMood.trim();
+    if (!mood) return;
+
+    const now = Date.now();
+    const dateLabel = (() => {
+      const parts = new Date(now).toDateString().split(" ");
+      return `${parts[0]} ${parts[1]} ${parts[2]}`;
+    })();
+
+    const entry = {
+      id: getId(),
+      createdAt: now,
+      date: dateLabel,
+      mood,
+      note: note.trim(),
+    };
+
+    setTimeline((prev) => [entry, ...prev]);
+    setSelectedMood("");
+    setNote("");
+  }
+
+  function deleteMoodEntry(id) {
+    setTimeline((prev) => prev.filter((e) => e.id !== id));
+  }
 
   const correlations = ["Mostly Inconclusive", "Might Like Weekends More"];
 
@@ -808,7 +907,8 @@ function MoodTrackerTab() {
         <div className="flex flex-wrap items-center gap-2">
           <select
             className="h-9 w-40 rounded border border-zinc-300 bg-white px-2 text-sm text-zinc-800"
-            defaultValue=""
+            value={selectedMood}
+            onChange={(e) => setSelectedMood(e.target.value)}
             aria-label="Select Mood"
           >
             <option value="" disabled>
@@ -825,11 +925,16 @@ function MoodTrackerTab() {
             className="h-9 w-72 rounded border border-zinc-300 bg-white px-2 text-sm text-zinc-800"
             placeholder="Extra Notes"
             aria-label="Extra Notes"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
           />
 
           <button
             type="button"
             className="h-9 rounded border border-zinc-400 bg-white px-4 text-sm font-medium text-zinc-900"
+            onClick={recordMood}
+            disabled={!selectedMood.trim()}
+            aria-disabled={!selectedMood.trim()}
           >
             Record Mood
           </button>
@@ -841,9 +946,23 @@ function MoodTrackerTab() {
           Recent Mood Timeline
         </div>
         <ul className="mt-3 space-y-2 text-sm text-zinc-800">
+          {timeline.length === 0 ? (
+            <li className="text-zinc-700">No mood entries yet.</li>
+          ) : null}
+
           {timeline.map((t) => (
-            <li key={t.date}>
-              {t.date} - {t.mood} - {t.note}
+            <li key={t.id} className="flex items-center justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                {t.date} - {t.mood}
+                {t.note ? ` - ${t.note}` : ""}
+              </div>
+              <button
+                type="button"
+                className="flex-none text-xs font-medium underline text-zinc-800"
+                onClick={() => deleteMoodEntry(t.id)}
+              >
+                Delete
+              </button>
             </li>
           ))}
         </ul>
@@ -876,6 +995,36 @@ function GuidedNotesTab() {
     "Take breaks between work",
   ];
 
+  const [personalNotes, setPersonalNotes] = React.useState(() => {
+    if (typeof window === "undefined") {
+      return "- I have been feeling a bit bored lately\n- Work is tiring me out";
+    }
+    const stored = safeParseJson(
+      window.localStorage.getItem("mytime.guidedNotes"),
+      null
+    );
+    if (stored && typeof stored === "object" && typeof stored.text === "string") {
+      return stored.text;
+    }
+    return "- I have been feeling a bit bored lately\n- Work is tiring me out";
+  });
+
+  const [saveStatus, setSaveStatus] = React.useState("");
+
+  function saveNotes() {
+    try {
+      window.localStorage.setItem(
+        "mytime.guidedNotes",
+        JSON.stringify({ text: personalNotes })
+      );
+      setSaveStatus("Saved.");
+      window.setTimeout(() => setSaveStatus(""), 1200);
+    } catch {
+      setSaveStatus("Could not save.");
+      window.setTimeout(() => setSaveStatus(""), 1200);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <section className="rounded border border-zinc-300 bg-white p-4">
@@ -890,9 +1039,23 @@ function GuidedNotesTab() {
       <section className="rounded border border-zinc-300 bg-white p-4">
         <div className="text-sm font-semibold text-zinc-900">Personal Notes</div>
         <div className="mt-3 rounded border border-zinc-300 bg-white p-4">
-          <div className="text-sm text-zinc-800">
-            <div>- I have been feeling a bit bored lately</div>
-            <div>- Work is tiring me out</div>
+          <textarea
+            className="min-h-28 w-full resize-none rounded border border-zinc-300 bg-white p-2 text-sm text-zinc-800"
+            aria-label="Personal Notes"
+            value={personalNotes}
+            onChange={(e) => setPersonalNotes(e.target.value)}
+          />
+          <div className="mt-2 flex items-center gap-3">
+            <button
+              type="button"
+              className="h-9 rounded border border-zinc-400 bg-white px-4 text-sm font-medium text-zinc-900"
+              onClick={saveNotes}
+            >
+              Save Notes
+            </button>
+            {saveStatus ? (
+              <div className="text-xs text-zinc-700">{saveStatus}</div>
+            ) : null}
           </div>
         </div>
       </section>

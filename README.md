@@ -16,6 +16,14 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## OpenAI (GPT-4o mini) Setup
+
+This project includes a simple server-side API route at `/api/chat` that calls OpenAI using your API key.
+
+- Create a `.env.local` file (not committed) based on `.env.local.example`
+- Set `OPENAI_API_KEY` (required)
+- Optionally set `OPENAI_MODEL` (defaults to `gpt-4o-mini`)
+
 You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
