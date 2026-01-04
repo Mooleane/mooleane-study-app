@@ -79,7 +79,12 @@ export default function WhyMyTimePage() {
               <section className="mt-6">
                 <h2 className="font-semibold text-zinc-900">The Project Plan</h2>
                 <p className="mt-2">
-                  <a href="#" className="underline">
+                  <a
+                    href="https://trello.com/invite/b/695a590c3d4d75827e956227/ATTI97a9a13fdc66037a1398310f8b3c42458F463227/aaron-lopez-winter-break-project-mytime"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
                     Trello Link
                   </a>
                 </p>
