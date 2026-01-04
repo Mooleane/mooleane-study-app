@@ -108,6 +108,7 @@ function StudyPlannerTab({
   onRemoveTask,
   onUpdateTask,
   onAddCategory,
+  onDeleteCategory,
   onStartSession,
   onEndSession,
 }) {
@@ -655,6 +656,22 @@ function StudyPlannerTab({
               <div className="text-xs font-medium text-zinc-800">
                 {b.category}
               </div>
+
+              {categories.length > 1 ? (
+                <button
+                  type="button"
+                  className="text-[11px] font-medium underline text-zinc-700"
+                  onClick={() => {
+                    const ok = window.confirm(
+                      `Delete category "${b.category}"? Tasks in this category will be reassigned.`
+                    );
+                    if (!ok) return;
+                    onDeleteCategory(b.category);
+                  }}
+                >
+                  Delete
+                </button>
+              ) : null}
             </div>
           ))}
         </div>
@@ -1009,6 +1026,33 @@ export default function DashboardPage() {
     });
   }
 
+  function deleteCategory(name) {
+    const trimmed = String(name ?? "").trim();
+    if (!trimmed) return;
+
+    setCategories((prev) => {
+      if (prev.length <= 1) return prev;
+
+      const remaining = prev.filter(
+        (c) => c.toLowerCase() !== trimmed.toLowerCase()
+      );
+
+      if (remaining.length === prev.length) return prev;
+      if (remaining.length === 0) return prev;
+
+      const fallback = remaining[0];
+      setTasks((taskPrev) =>
+        taskPrev.map((t) =>
+          t.category && t.category.toLowerCase() === trimmed.toLowerCase()
+            ? { ...t, category: fallback }
+            : t
+        )
+      );
+
+      return remaining;
+    });
+  }
+
   function createTask({ category, label, description, date }) {
     setTasks((prev) => [
       {
@@ -1195,6 +1239,7 @@ export default function DashboardPage() {
                       onRemoveTask={removeTask}
                       onUpdateTask={updateTask}
                       onAddCategory={addCategory}
+                      onDeleteCategory={deleteCategory}
                       onStartSession={startSession}
                       onEndSession={endSession}
                     />
