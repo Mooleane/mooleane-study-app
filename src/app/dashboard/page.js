@@ -106,6 +106,7 @@ function StudyPlannerTab({
   activeSession,
   onCreateTask,
   onRemoveTask,
+  onUpdateTask,
   onAddCategory,
   onStartSession,
   onEndSession,
@@ -117,6 +118,14 @@ function StudyPlannerTab({
   const [startTime, setStartTime] = React.useState("");
   const [endTime, setEndTime] = React.useState("");
 
+  const [editingTaskId, setEditingTaskId] = React.useState(null);
+  const [editCategory, setEditCategory] = React.useState(categories[0] ?? "Study");
+  const [editLabel, setEditLabel] = React.useState("");
+  const [editDescription, setEditDescription] = React.useState("");
+  const [editDate, setEditDate] = React.useState("");
+  const [editStartTime, setEditStartTime] = React.useState("");
+  const [editEndTime, setEditEndTime] = React.useState("");
+
   const canCreate = React.useMemo(() => {
     const trimmedLabel = label.trim();
     if (!trimmedLabel) return false;
@@ -126,11 +135,40 @@ function StudyPlannerTab({
     return startMs != null && endMs != null && endMs > startMs;
   }, [label, date, startTime, endTime]);
 
+  const canSaveEdit = React.useMemo(() => {
+    const trimmedLabel = editLabel.trim();
+    if (!trimmedLabel) return false;
+    if (!editDate.trim() || !editStartTime || !editEndTime) return false;
+    const startMs = combineDateAndTimeToMs(editDate.trim(), editStartTime);
+    const endMs = combineDateAndTimeToMs(editDate.trim(), editEndTime);
+    return startMs != null && endMs != null && endMs > startMs;
+  }, [editLabel, editDate, editStartTime, editEndTime]);
+
   React.useEffect(() => {
     if (!categories.includes(category)) {
       setCategory(categories[0] ?? "Study");
     }
   }, [categories, category]);
+
+  React.useEffect(() => {
+    if (!categories.includes(editCategory)) {
+      setEditCategory(categories[0] ?? "Study");
+    }
+  }, [categories, editCategory]);
+
+  function beginEdit(task) {
+    setEditingTaskId(task.id);
+    setEditCategory(task.category ?? (categories[0] ?? "Study"));
+    setEditLabel(task.label ?? "");
+    setEditDescription(task.description ?? "");
+    setEditDate(task.date ?? "");
+    setEditStartTime(task.startTime ?? "");
+    setEditEndTime(task.endTime ?? "");
+  }
+
+  function cancelEdit() {
+    setEditingTaskId(null);
+  }
 
   const sortedTasks = React.useMemo(() => {
     return [...tasks].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
@@ -180,81 +218,263 @@ function StudyPlannerTab({
 
         {sortedTasks.map((t) => {
           const plannedStartMs = combineDateAndTimeToMs(t.date, t.startTime);
-          const plannedEndMs = combineDateAndTimeToMs(t.date, t.endTime);
           const durationMs = getTaskDurationMs(t);
           const durationLabel = durationMs ? formatDuration(durationMs) : "";
-          const statusLabel =
-            plannedStartMs != null && nowMs < plannedStartMs ? "WAIT" : "START";
+          const statusLabel = t.endedAt
+            ? "ENDED"
+            : plannedStartMs != null && nowMs < plannedStartMs
+              ? "WAIT"
+              : "START";
           const isSessionForTask = activeSession?.taskId === t.id;
+          const isEditing = editingTaskId === t.id;
           const canStartSession =
             !isSessionForTask &&
             !activeSession &&
+            !t.endedAt &&
             durationMs != null &&
             plannedStartMs != null &&
             nowMs >= plannedStartMs;
           const canEndSession = isSessionForTask;
 
           return (
-          <div
-            key={t.id}
-            className="flex items-center justify-between gap-3 rounded border border-zinc-300 bg-white px-3 py-2 text-sm"
-          >
-            <button
-              type="button"
-              aria-label="Remove"
-              onClick={() => onRemoveTask(t.id)}
-              className="grid h-6 w-6 flex-none place-items-center rounded-full border border-zinc-400 bg-white text-zinc-700"
-            >
-              ×
-            </button>
+            <div key={t.id} className="space-y-2">
+              <div className="flex items-center justify-between gap-3 rounded border border-zinc-300 bg-white px-3 py-2 text-sm">
+                <button
+                  type="button"
+                  aria-label="Remove"
+                  onClick={() => onRemoveTask(t.id)}
+                  className="grid h-6 w-6 flex-none place-items-center rounded-full border border-zinc-400 bg-white text-zinc-700"
+                >
+                  ×
+                </button>
 
-            <div className="min-w-0 flex-1 text-zinc-800">
-              [{t.date || "No date"}{t.startTime ? ` ${t.startTime}` : ""}
-              {t.endTime ? `-${t.endTime}` : ""} {t.category}] {t.label}
-              {durationLabel ? ` (${durationLabel})` : ""}
-              {isSessionForTask && sessionRemainingLabel
-                ? ` (Session: ${sessionRemainingLabel})`
-                : ""}
+                <div className="min-w-0 flex-1 text-zinc-800">
+                  [{t.date || "No date"}{t.startTime ? ` ${t.startTime}` : ""}
+                  {t.endTime ? `-${t.endTime}` : ""} {t.category}] {t.label}
+                  {durationLabel ? ` (${durationLabel})` : ""}
+                  {` - [${statusLabel}]`}
+                  {isSessionForTask && sessionRemainingLabel
+                    ? ` (Session: ${sessionRemainingLabel})`
+                    : ""}
+                </div>
+
+                {canEndSession ? (
+                  <button
+                    type="button"
+                    className="flex-none text-xs font-medium underline text-zinc-800"
+                    onClick={() => onEndSession()}
+                  >
+                    [END]
+                  </button>
+                ) : statusLabel === "ENDED" ? (
+                  <span className="flex-none text-xs font-medium text-zinc-500">
+                    [ENDED]
+                  </span>
+                ) : statusLabel === "WAIT" ? (
+                  <span className="flex-none text-xs font-medium text-zinc-500">
+                    [WAIT]
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    className={
+                      "flex-none text-xs font-medium underline " +
+                      (canStartSession ? "text-zinc-800" : "text-zinc-400")
+                    }
+                    onClick={() => {
+                      if (!canStartSession) return;
+                      onStartSession(t.id);
+                    }}
+                    aria-disabled={!canStartSession}
+                    disabled={!canStartSession}
+                  >
+                    [START]
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  className="flex-none text-xs font-medium underline text-zinc-800"
+                  onClick={() =>
+                    t.description
+                      ? window.alert(t.description)
+                      : window.alert("No description.")
+                  }
+                >
+                  [View Desc]
+                </button>
+
+                {!isSessionForTask ? (
+                  <button
+                    type="button"
+                    className={
+                      "flex-none text-xs font-medium underline " +
+                      (isEditing ? "text-zinc-400" : "text-zinc-800")
+                    }
+                    onClick={() => {
+                      if (isEditing) return;
+                      beginEdit(t);
+                    }}
+                    aria-disabled={isEditing}
+                    disabled={isEditing}
+                  >
+                    [Edit]
+                  </button>
+                ) : null}
+              </div>
+
+              {isEditing ? (
+                <div className="rounded border border-zinc-300 bg-white p-3">
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-end gap-2">
+                      <div className="flex flex-col">
+                        <label
+                          htmlFor={`edit-task-category-${t.id}`}
+                          className="mb-1 text-[11px] text-zinc-700"
+                        >
+                          Task type
+                        </label>
+                        <select
+                          id={`edit-task-category-${t.id}`}
+                          className="h-9 w-36 rounded border border-zinc-300 bg-white px-2 text-sm text-zinc-800"
+                          value={editCategory}
+                          onChange={(e) => setEditCategory(e.target.value)}
+                          aria-label="Category"
+                        >
+                          {categories.map((c) => (
+                            <option key={c} value={c}>
+                              {c}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="flex flex-col">
+                        <label
+                          htmlFor={`edit-task-label-${t.id}`}
+                          className="mb-1 text-[11px] text-zinc-700"
+                        >
+                          Task label
+                        </label>
+                        <input
+                          id={`edit-task-label-${t.id}`}
+                          className="h-9 w-36 rounded border border-zinc-300 bg-white px-2 text-sm text-zinc-800"
+                          aria-label="Task Label"
+                          value={editLabel}
+                          onChange={(e) => setEditLabel(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="flex flex-col">
+                        <label
+                          htmlFor={`edit-task-description-${t.id}`}
+                          className="mb-1 text-[11px] text-zinc-700"
+                        >
+                          Task description
+                        </label>
+                        <input
+                          id={`edit-task-description-${t.id}`}
+                          className="h-9 w-56 rounded border border-zinc-300 bg-white px-2 text-sm text-zinc-800"
+                          aria-label="Task Description"
+                          value={editDescription}
+                          onChange={(e) => setEditDescription(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-end gap-2">
+                      <div className="flex flex-col">
+                        <label
+                          htmlFor={`edit-task-date-${t.id}`}
+                          className="mb-1 text-[11px] text-zinc-700"
+                        >
+                          Date
+                        </label>
+                        <input
+                          id={`edit-task-date-${t.id}`}
+                          className="h-9 w-40 rounded border border-zinc-300 bg-white px-2 text-sm text-zinc-800"
+                          type="date"
+                          aria-label="Task Date"
+                          value={editDate}
+                          onChange={(e) => setEditDate(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="flex flex-col">
+                        <label
+                          htmlFor={`edit-task-start-${t.id}`}
+                          className="mb-1 text-[11px] text-zinc-700"
+                        >
+                          Start time
+                        </label>
+                        <input
+                          id={`edit-task-start-${t.id}`}
+                          className="h-9 w-32 rounded border border-zinc-300 bg-white px-2 text-sm text-zinc-800"
+                          type="time"
+                          aria-label="Start Time"
+                          value={editStartTime}
+                          onChange={(e) => setEditStartTime(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="flex flex-col">
+                        <label
+                          htmlFor={`edit-task-end-${t.id}`}
+                          className="mb-1 text-[11px] text-zinc-700"
+                        >
+                          End time
+                        </label>
+                        <input
+                          id={`edit-task-end-${t.id}`}
+                          className="h-9 w-32 rounded border border-zinc-300 bg-white px-2 text-sm text-zinc-800"
+                          type="time"
+                          aria-label="End Time"
+                          value={editEndTime}
+                          onChange={(e) => setEditEndTime(e.target.value)}
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        className="h-9 rounded border border-zinc-400 bg-white px-4 text-sm font-medium text-zinc-900"
+                        disabled={!canSaveEdit}
+                        aria-disabled={!canSaveEdit}
+                        title={
+                          canSaveEdit
+                            ? "Save changes"
+                            : "Enter a label, date, start time, and end time (end after start)."
+                        }
+                        onClick={() => {
+                          if (!editingTaskId) return;
+                          if (!canSaveEdit) return;
+
+                          onUpdateTask(editingTaskId, {
+                            category: editCategory,
+                            label: editLabel.trim(),
+                            description: editDescription.trim(),
+                            date: editDate.trim(),
+                            startTime: editStartTime,
+                            endTime: editEndTime,
+                          });
+
+                          setEditingTaskId(null);
+                        }}
+                      >
+                        Save
+                      </button>
+
+                      <button
+                        type="button"
+                        className="h-9 rounded border border-zinc-400 bg-white px-4 text-sm font-medium text-zinc-800"
+                        onClick={() => cancelEdit()}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
             </div>
-
-            {canEndSession ? (
-              <button
-                type="button"
-                className="flex-none text-xs font-medium underline text-zinc-800"
-                onClick={() => onEndSession()}
-              >
-                [END]
-              </button>
-            ) : (
-              <button
-                type="button"
-                className={
-                  "flex-none text-xs font-medium underline " +
-                  (canStartSession ? "text-zinc-800" : "text-zinc-400")
-                }
-                onClick={() => {
-                  if (!canStartSession) return;
-                  onStartSession(t.id);
-                }}
-                aria-disabled={!canStartSession}
-                disabled={!canStartSession}
-              >
-                [START]
-              </button>
-            )}
-
-            <button
-              type="button"
-              className="flex-none text-xs font-medium underline text-zinc-800"
-              onClick={() =>
-                t.description
-                  ? window.alert(t.description)
-                  : window.alert("No description.")
-              }
-            >
-              [View Desc]
-            </button>
-          </div>
           );
         })}
       </div>
@@ -760,6 +980,14 @@ export default function DashboardPage() {
   React.useEffect(() => {
     if (!activeSession?.endsAt) return;
     if (nowMs >= activeSession.endsAt) {
+      const endedTaskId = activeSession.taskId;
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === endedTaskId
+            ? { ...t, endedAt: activeSession.endsAt }
+            : t
+        )
+      );
       setActiveSession(null);
     }
   }, [activeSession, nowMs]);
@@ -792,6 +1020,7 @@ export default function DashboardPage() {
         startTime: arguments[0]?.startTime ?? "",
         endTime: arguments[0]?.endTime ?? "",
         status: "WAIT",
+        endedAt: null,
         createdAt: Date.now(),
       },
       ...prev,
@@ -803,10 +1032,17 @@ export default function DashboardPage() {
     setActiveSession((prev) => (prev?.taskId === id ? null : prev));
   }
 
+  function updateTask(id, patch) {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, ...patch } : t))
+    );
+  }
+
   function startSession(taskId) {
     if (activeSession && activeSession.taskId !== taskId) return;
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
+    if (task.endedAt) return;
 
     const durationMs = getTaskDurationMs(task);
     if (!durationMs) return;
@@ -823,6 +1059,16 @@ export default function DashboardPage() {
   }
 
   function endSession() {
+    const endedTaskId = activeSession?.taskId;
+    if (endedTaskId) {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === endedTaskId
+            ? { ...t, endedAt: Date.now() }
+            : t
+        )
+      );
+    }
     setActiveSession(null);
   }
 
@@ -867,8 +1113,9 @@ export default function DashboardPage() {
                         const durationLabel = durationMs
                           ? formatDuration(durationMs)
                           : "";
-                        const statusLabel =
-                          plannedStartMs != null && nowMs < plannedStartMs
+                        const statusLabel = t.endedAt
+                          ? "ENDED"
+                          : plannedStartMs != null && nowMs < plannedStartMs
                             ? "WAIT"
                             : "START";
                         const isSessionForTask = activeSession?.taskId === t.id;
@@ -896,6 +1143,7 @@ export default function DashboardPage() {
                           [{t.date || "No date"}{t.startTime ? ` ${t.startTime}` : ""}
                           {t.endTime ? `-${t.endTime}` : ""} {t.category}] {t.label}
                           {durationLabel ? ` (${durationLabel})` : ""}
+                          {` - [${statusLabel}]`}
                           {remainingLabel ? ` (Session: ${remainingLabel})` : ""}
                         </li>
                         );
@@ -945,6 +1193,7 @@ export default function DashboardPage() {
                       activeSession={activeSession}
                       onCreateTask={createTask}
                       onRemoveTask={removeTask}
+                      onUpdateTask={updateTask}
                       onAddCategory={addCategory}
                       onStartSession={startSession}
                       onEndSession={endSession}
