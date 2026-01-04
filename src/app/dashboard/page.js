@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useSearchParams } from "next/navigation";
-import SidebarNav from "../../components/SidebarNav";
+import { SidebarNavWithFooter } from "../../components/SidebarNav";
 
 const TAB_PARAM_TO_LABEL = {
   "study-planner": "Study Planner",
@@ -693,7 +693,16 @@ function StudyPlannerTab({
   );
 }
 
-function BreakdownWizardTab() {
+function BreakdownWizardTab({
+  taskName,
+  taskDate,
+  priority,
+  onChangeTaskName,
+  onChangeTaskDate,
+  onChangePriority,
+  steps,
+  showGenerateHint,
+}) {
   const defaultSteps = [
     "Research context (30m)",
     "Outline key points (20m)",
@@ -701,44 +710,7 @@ function BreakdownWizardTab() {
     "First revision (30m)",
   ];
 
-  const [taskName, setTaskName] = React.useState("");
-  const [taskDate, setTaskDate] = React.useState("");
-  const [priority, setPriority] = React.useState("");
-  const [steps, setSteps] = React.useState(defaultSteps);
-  const [isGenerating, setIsGenerating] = React.useState(false);
-  const [generateError, setGenerateError] = React.useState("");
-
-  async function generateSuggestedSteps() {
-    const trimmedName = taskName.trim();
-    if (!trimmedName) return;
-
-    setIsGenerating(true);
-    setGenerateError("");
-
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          taskName: trimmedName,
-          taskDate: taskDate.trim(),
-          priority: priority.trim(),
-        }),
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data?.error || "Failed to generate steps.");
-      }
-
-      const nextSteps = Array.isArray(data?.steps) ? data.steps : [];
-      setSteps(nextSteps.length > 0 ? nextSteps : defaultSteps);
-    } catch (e) {
-      setGenerateError(e?.message || "Failed to generate steps.");
-    } finally {
-      setIsGenerating(false);
-    }
-  }
+  const shownSteps = Array.isArray(steps) && steps.length > 0 ? steps : defaultSteps;
 
   return (
     <div className="space-y-6">
@@ -751,19 +723,19 @@ function BreakdownWizardTab() {
           placeholder="Task Name"
           aria-label="Task Name"
           value={taskName}
-          onChange={(e) => setTaskName(e.target.value)}
+          onChange={(e) => onChangeTaskName(e.target.value)}
         />
         <input
           className="h-9 w-40 rounded border border-zinc-300 bg-white px-2 text-sm text-zinc-800"
           type="date"
           aria-label="Task Date"
           value={taskDate}
-          onChange={(e) => setTaskDate(e.target.value)}
+          onChange={(e) => onChangeTaskDate(e.target.value)}
         />
         <select
           className="h-9 w-48 rounded border border-zinc-300 bg-white px-2 text-sm text-zinc-800"
           value={priority}
-          onChange={(e) => setPriority(e.target.value)}
+          onChange={(e) => onChangePriority(e.target.value)}
           aria-label="Priority"
         >
           <option value="" disabled>
@@ -792,28 +764,33 @@ function BreakdownWizardTab() {
             type="button"
             className={
               "rounded border border-zinc-400 bg-white px-4 py-2 text-xs font-medium " +
-              (taskName.trim() && !isGenerating
+              (taskName.trim()
                 ? "text-zinc-800"
                 : "text-zinc-400")
             }
-            onClick={generateSuggestedSteps}
-            disabled={!taskName.trim() || isGenerating}
-            aria-disabled={!taskName.trim() || isGenerating}
+            onClick={() => {
+              // Suggestions are generated only via the sidebar button.
+            }}
+            disabled
+            aria-disabled
             title={
-              taskName.trim()
-                ? "Generate steps using AI"
-                : "Enter a task name first"
+              showGenerateHint
+                ? "Use Regenerate suggestions in the sidebar"
+                : ""
             }
           >
-            {isGenerating ? "Generating…" : "Generate"}
+            Generate
           </button>
         </div>
 
-        {generateError ? (
-          <div className="mt-2 text-xs text-zinc-700">{generateError}</div>
+        {showGenerateHint ? (
+          <div className="mt-2 text-xs text-zinc-700">
+            Use <span className="font-semibold">Regenerate suggestions</span> in the sidebar
+            to update AI steps.
+          </div>
         ) : null}
         <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-zinc-800">
-          {steps.map((s) => (
+          {shownSteps.map((s) => (
             <li key={s}>{s}</li>
           ))}
         </ol>
@@ -961,19 +938,23 @@ function GuidedNotesTab({ moodSummary, topCategory, hasUpcomingAssignment }) {
     "Take breaks between work",
   ];
 
-  const [personalNotes, setPersonalNotes] = React.useState(() => {
-    if (typeof window === "undefined") {
-      return "- I have been feeling a bit bored lately\n- Work is tiring me out";
+  const [personalNotes, setPersonalNotes] = React.useState(
+    "- I have been feeling a bit bored lately\n- Work is tiring me out"
+  );
+
+  React.useEffect(() => {
+    try {
+      const stored = safeParseJson(
+        window.localStorage.getItem("mytime.guidedNotes"),
+        null
+      );
+      if (stored && typeof stored === "object" && typeof stored.text === "string") {
+        setPersonalNotes(stored.text);
+      }
+    } catch {
+      // ignore
     }
-    const stored = safeParseJson(
-      window.localStorage.getItem("mytime.guidedNotes"),
-      null
-    );
-    if (stored && typeof stored === "object" && typeof stored.text === "string") {
-      return stored.text;
-    }
-    return "- I have been feeling a bit bored lately\n- Work is tiring me out";
-  });
+  }, []);
 
   const [saveStatus, setSaveStatus] = React.useState("");
 
@@ -1048,6 +1029,7 @@ function GuidedNotesTab({ moodSummary, topCategory, hasUpcomingAssignment }) {
 }
 
 export default function DashboardPage() {
+  const AI_BUNDLE_KEY = "mytime.aiBundle";
   const tabs = [
     "Study Planner",
     "Breakdown wizard",
@@ -1057,49 +1039,120 @@ export default function DashboardPage() {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
 
-  const [categories, setCategories] = React.useState(() => {
-    if (typeof window === "undefined") return ["Study", "Self", "Work"];
-    const stored = safeParseJson(
-      window.localStorage.getItem("mytime.categories"),
-      null
-    );
-    return Array.isArray(stored) && stored.length > 0
-      ? stored
-      : ["Study", "Self", "Work"];
-  });
+  const defaultCategories = React.useMemo(() => ["Study", "Self", "Work"], []);
+  const [categories, setCategories] = React.useState(defaultCategories);
+  const [tasks, setTasks] = React.useState([]);
+  const [moods, setMoods] = React.useState([]);
 
-  const [tasks, setTasks] = React.useState(() => {
-    if (typeof window === "undefined") return [];
-    const stored = safeParseJson(
-      window.localStorage.getItem("mytime.tasks"),
-      []
-    );
-    return Array.isArray(stored) ? stored : [];
-  });
+  const [breakdownTaskName, setBreakdownTaskName] = React.useState("");
+  const [breakdownTaskDate, setBreakdownTaskDate] = React.useState("");
+  const [breakdownPriority, setBreakdownPriority] = React.useState("");
 
-  const [moods, setMoods] = React.useState(() => {
-    if (typeof window === "undefined") return [];
-    const stored = safeParseJson(
-      window.localStorage.getItem("mytime.moods"),
-      []
-    );
-    return Array.isArray(stored) ? stored : [];
-  });
+  const aiFallback = React.useMemo(
+    () => ({
+      generatedAt: null,
+      breakdownSteps: [],
+      moodCorrelations: ["Mostly Inconclusive", "Might Like Weekends More"],
+      moodSummary: "",
+      quickCheck: {
+        mood: "Mostly Neutral",
+        balance: "A lot of studying",
+        tip: "Free more time for yourself",
+      },
+    }),
+    []
+  );
 
-  const [activeSession, setActiveSession] = React.useState(() => {
-    if (typeof window === "undefined") return null;
-    const stored = safeParseJson(
-      window.localStorage.getItem("mytime.activeSession"),
-      null
-    );
-    return stored && typeof stored === "object" ? stored : null;
-  });
+  const [aiBundle, setAiBundle] = React.useState(aiFallback);
 
-  const [nowMs, setNowMs] = React.useState(() => Date.now());
+  const [isRegenerating, setIsRegenerating] = React.useState(false);
+  const [regenError, setRegenError] = React.useState("");
+
+  const [activeSession, setActiveSession] = React.useState(null);
+  const [nowMs, setNowMs] = React.useState(0);
+  const [hasHydrated, setHasHydrated] = React.useState(false);
 
   const [activeTab, setActiveTab] = React.useState(
     getInitialTabLabel(tabParam) ?? "Study Planner"
   );
+
+  React.useEffect(() => {
+    try {
+      const storedCategories = safeParseJson(
+        window.localStorage.getItem("mytime.categories"),
+        null
+      );
+      if (Array.isArray(storedCategories) && storedCategories.length > 0) {
+        setCategories(storedCategories);
+      }
+
+      const storedTasks = safeParseJson(
+        window.localStorage.getItem("mytime.tasks"),
+        []
+      );
+      if (Array.isArray(storedTasks)) {
+        setTasks(storedTasks);
+      }
+
+      const storedMoods = safeParseJson(
+        window.localStorage.getItem("mytime.moods"),
+        []
+      );
+      if (Array.isArray(storedMoods)) {
+        setMoods(storedMoods);
+      }
+
+      const storedSession = safeParseJson(
+        window.localStorage.getItem("mytime.activeSession"),
+        null
+      );
+      if (storedSession && typeof storedSession === "object") {
+        setActiveSession(storedSession);
+      }
+
+      const storedBundle = safeParseJson(
+        window.localStorage.getItem(AI_BUNDLE_KEY),
+        null
+      );
+      if (storedBundle && typeof storedBundle === "object") {
+        setAiBundle((prev) => ({
+          ...prev,
+          generatedAt: storedBundle.generatedAt ?? prev.generatedAt,
+          breakdownSteps: Array.isArray(storedBundle.breakdownSteps)
+            ? storedBundle.breakdownSteps
+            : prev.breakdownSteps,
+          moodCorrelations: Array.isArray(storedBundle.moodCorrelations)
+            ? storedBundle.moodCorrelations
+            : prev.moodCorrelations,
+          moodSummary:
+            typeof storedBundle.moodSummary === "string"
+              ? storedBundle.moodSummary
+              : prev.moodSummary,
+          quickCheck: {
+            mood:
+              typeof storedBundle?.quickCheck?.mood === "string"
+                ? storedBundle.quickCheck.mood
+                : prev.quickCheck.mood,
+            balance:
+              typeof storedBundle?.quickCheck?.balance === "string"
+                ? storedBundle.quickCheck.balance
+                : prev.quickCheck.balance,
+            tip:
+              typeof storedBundle?.quickCheck?.tip === "string"
+                ? storedBundle.quickCheck.tip
+                : prev.quickCheck.tip,
+          },
+        }));
+      }
+    } catch {
+      // ignore
+    } finally {
+      setHasHydrated(true);
+      setNowMs(Date.now());
+    }
+    // Intentionally run once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   React.useEffect(() => {
     const nextTab = getInitialTabLabel(tabParam);
@@ -1111,6 +1164,7 @@ export default function DashboardPage() {
   }, [tabParam]);
 
   React.useEffect(() => {
+    if (!hasHydrated) return;
     try {
       window.localStorage.setItem(
         "mytime.categories",
@@ -1119,25 +1173,28 @@ export default function DashboardPage() {
     } catch {
       // ignore
     }
-  }, [categories]);
+  }, [categories, hasHydrated]);
 
   React.useEffect(() => {
+    if (!hasHydrated) return;
     try {
       window.localStorage.setItem("mytime.tasks", JSON.stringify(tasks));
     } catch {
       // ignore
     }
-  }, [tasks]);
+  }, [tasks, hasHydrated]);
 
   React.useEffect(() => {
+    if (!hasHydrated) return;
     try {
       window.localStorage.setItem("mytime.moods", JSON.stringify(moods));
     } catch {
       // ignore
     }
-  }, [moods]);
+  }, [moods, hasHydrated]);
 
   React.useEffect(() => {
+    if (!hasHydrated) return;
     try {
       if (!activeSession) {
         window.localStorage.removeItem("mytime.activeSession");
@@ -1150,7 +1207,7 @@ export default function DashboardPage() {
     } catch {
       // ignore
     }
-  }, [activeSession]);
+  }, [activeSession, hasHydrated]);
 
   React.useEffect(() => {
     const id = window.setInterval(() => {
@@ -1203,71 +1260,55 @@ export default function DashboardPage() {
     });
   }, [tasks, nowMs]);
 
-  const [aiMoodCorrelations, setAiMoodCorrelations] = React.useState([
-    "Mostly Inconclusive",
-    "Might Like Weekends More",
-  ]);
-  const [aiMoodSummary, setAiMoodSummary] = React.useState("");
-  const [aiQuickCheck, setAiQuickCheck] = React.useState({
-    mood: "Mostly Neutral",
-    balance: "A lot of studying",
-    tip: "Free more time for yourself",
-  });
+  async function regenerateSuggestions() {
+    setIsRegenerating(true);
+    setRegenError("");
 
-  async function fetchInsights(mode, payload) {
-    const res = await fetch("/api/insights", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode, payload }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data?.error || "AI request failed");
-    return data;
-  }
+    try {
+      const payload = {
+        moods,
+        topCategory,
+        taskCounts,
+        hasUpcomingAssignment,
+        assignment: {
+          taskName: breakdownTaskName,
+          taskDate: breakdownTaskDate,
+          priority: breakdownPriority,
+        },
+      };
 
-  React.useEffect(() => {
-    let cancelled = false;
+      const res = await fetch("/api/suggestions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ payload }),
+      });
 
-    (async () => {
-      try {
-        const payload = {
-          moods,
-          topCategory,
-          taskCounts,
-        };
-
-        const [corr, summary, quick] = await Promise.all([
-          fetchInsights("moodCorrelations", payload),
-          fetchInsights("moodSummary", payload),
-          fetchInsights("quickCheck", payload),
-        ]);
-
-        if (cancelled) return;
-
-        if (Array.isArray(corr?.bullets) && corr.bullets.length > 0) {
-          setAiMoodCorrelations(corr.bullets);
-        }
-        if (typeof summary?.summary === "string") {
-          setAiMoodSummary(summary.summary);
-        }
-        if (quick && typeof quick === "object") {
-          setAiQuickCheck({
-            mood: quick.mood || aiQuickCheck.mood,
-            balance: quick.balance || aiQuickCheck.balance,
-            tip: quick.tip || aiQuickCheck.tip,
-          });
-        }
-      } catch {
-        // keep previous values
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to regenerate suggestions.");
       }
-    })();
 
-    return () => {
-      cancelled = true;
-    };
-    // Intentionally avoid nowMs so we don't call AI every second.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [moods, topCategory, categories, tasks]);
+      setAiBundle((prev) => ({
+        ...prev,
+        ...data,
+        quickCheck: {
+          mood: data?.quickCheck?.mood ?? prev.quickCheck.mood,
+          balance: data?.quickCheck?.balance ?? prev.quickCheck.balance,
+          tip: data?.quickCheck?.tip ?? prev.quickCheck.tip,
+        },
+      }));
+
+      try {
+        window.localStorage.setItem(AI_BUNDLE_KEY, JSON.stringify(data));
+      } catch {
+        // ignore
+      }
+    } catch (e) {
+      setRegenError(e?.message || "Failed to regenerate suggestions.");
+    } finally {
+      setIsRegenerating(false);
+    }
+  }
 
   function recordMoodEntry({ mood, note }) {
     const now = Date.now();
@@ -1403,7 +1444,27 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex min-h-[calc(100vh-49px)]">
-          <SidebarNav />
+          <SidebarNavWithFooter
+            footer={
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  className={
+                    "w-full rounded border border-zinc-400 bg-white px-3 py-2 text-sm font-medium " +
+                    (isRegenerating ? "text-zinc-400" : "text-zinc-800")
+                  }
+                  onClick={regenerateSuggestions}
+                  disabled={isRegenerating}
+                  aria-disabled={isRegenerating}
+                >
+                  {isRegenerating ? "Regenerating…" : "Regenerate suggestions"}
+                </button>
+                {regenError ? (
+                  <div className="text-xs text-zinc-700">{regenError}</div>
+                ) : null}
+              </div>
+            }
+          />
 
           <main className="flex-1 overflow-y-auto px-10 py-10">
             <div className="mx-auto max-w-5xl">
@@ -1474,13 +1535,13 @@ export default function DashboardPage() {
                   </h2>
                   <div className="mt-2 rounded border border-zinc-400 bg-white p-4 text-sm text-zinc-800">
                     <p>
-                      <span className="font-semibold">Mood:</span> {aiQuickCheck.mood}
+                      <span className="font-semibold">Mood:</span> {aiBundle.quickCheck.mood}
                     </p>
                     <p className="mt-2">
-                      <span className="font-semibold">Balance:</span> {aiQuickCheck.balance}
+                      <span className="font-semibold">Balance:</span> {aiBundle.quickCheck.balance}
                     </p>
                     <p className="mt-2">
-                      <span className="font-semibold">Tip:</span> {aiQuickCheck.tip}
+                      <span className="font-semibold">Tip:</span> {aiBundle.quickCheck.tip}
                     </p>
                   </div>
                 </section>
@@ -1515,19 +1576,28 @@ export default function DashboardPage() {
                     />
                   ) : null}
                   {activeTab === "Breakdown wizard" ? (
-                    <BreakdownWizardTab />
+                    <BreakdownWizardTab
+                      taskName={breakdownTaskName}
+                      taskDate={breakdownTaskDate}
+                      priority={breakdownPriority}
+                      onChangeTaskName={setBreakdownTaskName}
+                      onChangeTaskDate={setBreakdownTaskDate}
+                      onChangePriority={setBreakdownPriority}
+                      steps={aiBundle.breakdownSteps}
+                      showGenerateHint
+                    />
                   ) : null}
                   {activeTab === "Mood Tracker" ? (
                     <MoodTrackerTab
                       timeline={moods}
-                      correlations={aiMoodCorrelations}
+                      correlations={aiBundle.moodCorrelations}
                       onRecordMood={recordMoodEntry}
                       onDeleteMoodEntry={deleteMoodEntry}
                     />
                   ) : null}
                   {activeTab === "Guided Notes" ? (
                     <GuidedNotesTab
-                      moodSummary={aiMoodSummary}
+                      moodSummary={aiBundle.moodSummary}
                       topCategory={topCategory}
                       hasUpcomingAssignment={hasUpcomingAssignment}
                     />
