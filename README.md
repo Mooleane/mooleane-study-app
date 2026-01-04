@@ -115,4 +115,4 @@ What didn't (or was tricky):
 What I'd improve next:
 
 - The appearance of the CSS (more colors/vibrancy)
-- 
+- Add more calm features such as a music player or meditation tab
