@@ -11,6 +11,13 @@ const TAB_PARAM_TO_LABEL = {
   "guided-notes": "Guided Notes",
 };
 
+const DEFAULT_BREAKDOWN_STEPS = [
+  "Research context (30m)",
+  "Outline key points (20m)",
+  "Draft introduction (45m)",
+  "First revision (30m)",
+];
+
 function getInitialTabLabel(tabParam) {
   if (!tabParam) return null;
 
@@ -97,6 +104,45 @@ function computeCategoryCounts(categories, tasks) {
     }
   }
   return counts;
+}
+
+function parseIsoDate(iso) {
+  const parts = String(iso ?? "").split("-");
+  if (parts.length !== 3) return null;
+  const y = Number(parts[0]);
+  const m = Number(parts[1]);
+  const d = Number(parts[2]);
+  if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return null;
+  if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+  const date = new Date(y, m - 1, d);
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
+}
+
+function formatIsoDate(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function parseStepMinutes(stepText) {
+  const match = String(stepText ?? "").match(/\((\d+)\s*m\)/i);
+  if (!match) return 30;
+  const n = Number(match[1]);
+  if (!Number.isFinite(n) || n <= 0) return 30;
+  return Math.max(5, Math.min(300, Math.round(n)));
+}
+
+function addMinutesToTimeHHMM(startHHMM, minutesToAdd) {
+  const [hStr, mStr] = String(startHHMM ?? "").split(":");
+  const h = Number(hStr);
+  const m = Number(mStr);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return startHHMM;
+  const total = Math.min(23 * 60 + 59, h * 60 + m + (Number(minutesToAdd) || 0));
+  const hh = String(Math.floor(total / 60)).padStart(2, "0");
+  const mm = String(total % 60).padStart(2, "0");
+  return `${hh}:${mm}`;
 }
 
 function StudyPlannerTab({
@@ -702,15 +748,29 @@ function BreakdownWizardTab({
   onChangePriority,
   steps,
   showGenerateHint,
+  onEditStep,
+  onDeleteStep,
+  onAssignStep,
 }) {
-  const defaultSteps = [
-    "Research context (30m)",
-    "Outline key points (20m)",
-    "Draft introduction (45m)",
-    "First revision (30m)",
-  ];
+  const shownSteps =
+    Array.isArray(steps) && steps.length > 0 ? steps : DEFAULT_BREAKDOWN_STEPS;
 
-  const shownSteps = Array.isArray(steps) && steps.length > 0 ? steps : defaultSteps;
+  const [selectedStepIndex, setSelectedStepIndex] = React.useState(null);
+
+  React.useEffect(() => {
+    if (!Array.isArray(shownSteps) || shownSteps.length === 0) {
+      setSelectedStepIndex(null);
+      return;
+    }
+
+    if (
+      selectedStepIndex == null ||
+      selectedStepIndex < 0 ||
+      selectedStepIndex >= shownSteps.length
+    ) {
+      setSelectedStepIndex(null);
+    }
+  }, [shownSteps, selectedStepIndex]);
 
   return (
     <div className="space-y-6">
@@ -775,7 +835,7 @@ function BreakdownWizardTab({
             aria-disabled
             title={
               showGenerateHint
-                ? "Use Regenerate suggestions in the sidebar"
+                ? "Use Regenerate Suggestions in the sidebar"
                 : ""
             }
           >
@@ -785,32 +845,98 @@ function BreakdownWizardTab({
 
         {showGenerateHint ? (
           <div className="mt-2 text-xs text-zinc-700">
-            Use <span className="font-semibold">Regenerate suggestions</span> in the sidebar
+            Use <span className="font-semibold">Regenerate Suggestions</span> in the sidebar
             to update AI steps.
           </div>
         ) : null}
         <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-zinc-800">
-          {shownSteps.map((s) => (
-            <li key={s}>{s}</li>
-          ))}
+          {shownSteps.map((s, idx) => {
+            const selected = idx === selectedStepIndex;
+            return (
+              <li key={`${idx}-${s}`}>
+                <button
+                  type="button"
+                  className={
+                    "w-full rounded border px-3 py-2 text-left text-sm " +
+                    (selected
+                      ? "border-zinc-400 bg-zinc-100 text-zinc-900"
+                      : "border-zinc-300 bg-white text-zinc-800")
+                  }
+                  onClick={() => setSelectedStepIndex(idx)}
+                >
+                  {s}
+                </button>
+              </li>
+            );
+          })}
         </ol>
 
         <div className="mt-6 flex flex-wrap gap-2">
           <button
             type="button"
-            className="rounded border border-zinc-400 bg-white px-4 py-2 text-xs font-medium text-zinc-800"
+            className={
+              "rounded border border-zinc-400 bg-white px-4 py-2 text-xs font-medium " +
+              (selectedStepIndex == null ? "text-zinc-400" : "text-zinc-800")
+            }
+            disabled={selectedStepIndex == null}
+            aria-disabled={selectedStepIndex == null}
+            title={
+              selectedStepIndex == null
+                ? "Select a suggested step first"
+                : "Edit selected step"
+            }
+            onClick={() => {
+              if (selectedStepIndex == null) return;
+              const current = shownSteps[selectedStepIndex] ?? "";
+              const next = window.prompt("Edit step:", current);
+              if (next == null) return;
+              const trimmed = next.trim();
+              if (!trimmed) return;
+              onEditStep?.(selectedStepIndex, trimmed);
+            }}
           >
             Edit Step
           </button>
           <button
             type="button"
-            className="rounded border border-zinc-400 bg-white px-4 py-2 text-xs font-medium text-zinc-800"
+            className={
+              "rounded border border-zinc-400 bg-white px-4 py-2 text-xs font-medium " +
+              (selectedStepIndex == null ? "text-zinc-400" : "text-zinc-800")
+            }
+            disabled={selectedStepIndex == null}
+            aria-disabled={selectedStepIndex == null}
+            title={
+              selectedStepIndex == null
+                ? "Select a suggested step first"
+                : "Delete selected step"
+            }
+            onClick={() => {
+              if (selectedStepIndex == null) return;
+              const ok = window.confirm("Delete selected step?");
+              if (!ok) return;
+              onDeleteStep?.(selectedStepIndex);
+              setSelectedStepIndex(null);
+            }}
           >
             Delete Step
           </button>
           <button
             type="button"
-            className="rounded border border-zinc-400 bg-white px-4 py-2 text-xs font-medium text-zinc-800"
+            className={
+              "rounded border border-zinc-400 bg-white px-4 py-2 text-xs font-medium " +
+              (selectedStepIndex == null ? "text-zinc-400" : "text-zinc-800")
+            }
+            disabled={selectedStepIndex == null}
+            aria-disabled={selectedStepIndex == null}
+            title={
+              selectedStepIndex == null
+                ? "Select a suggested step first"
+                : "Assign selected step to Study Planner"
+            }
+            onClick={() => {
+              if (selectedStepIndex == null) return;
+              onAssignStep?.(selectedStepIndex);
+            }}
           >
             Assign to Planner
           </button>
@@ -1028,7 +1154,7 @@ function GuidedNotesTab({ moodSummary, topCategory, hasUpcomingAssignment }) {
   );
 }
 
-export default function DashboardPage() {
+function DashboardPageInner() {
   const AI_BUNDLE_KEY = "mytime.aiBundle";
   const tabs = [
     "Study Planner",
@@ -1366,6 +1492,21 @@ export default function DashboardPage() {
     });
   }
 
+  function persistAiBundle(next) {
+    try {
+      window.localStorage.setItem(AI_BUNDLE_KEY, JSON.stringify(next));
+    } catch {
+      // ignore
+    }
+  }
+
+  function getCurrentBreakdownSteps() {
+    const current = Array.isArray(aiBundle.breakdownSteps)
+      ? aiBundle.breakdownSteps
+      : [];
+    return current.length > 0 ? current : DEFAULT_BREAKDOWN_STEPS;
+  }
+
   function createTask({ category, label, description, date }) {
     setTasks((prev) => [
       {
@@ -1382,6 +1523,83 @@ export default function DashboardPage() {
       },
       ...prev,
     ]);
+  }
+
+  function editBreakdownStep(stepIndex, nextText) {
+    const idx = Number(stepIndex);
+    if (!Number.isFinite(idx)) return;
+
+    setAiBundle((prev) => {
+      const currentRaw = Array.isArray(prev.breakdownSteps)
+        ? prev.breakdownSteps
+        : [];
+      const base = currentRaw.length > 0 ? currentRaw : DEFAULT_BREAKDOWN_STEPS;
+      if (idx < 0 || idx >= base.length) return prev;
+      const nextSteps = base.map((s, i) => (i === idx ? nextText : s));
+      const next = { ...prev, breakdownSteps: nextSteps };
+      persistAiBundle(next);
+      return next;
+    });
+  }
+
+  function deleteBreakdownStep(stepIndex) {
+    const idx = Number(stepIndex);
+    if (!Number.isFinite(idx)) return;
+
+    setAiBundle((prev) => {
+      const currentRaw = Array.isArray(prev.breakdownSteps)
+        ? prev.breakdownSteps
+        : [];
+      const base = currentRaw.length > 0 ? currentRaw : DEFAULT_BREAKDOWN_STEPS;
+      if (idx < 0 || idx >= base.length) return prev;
+      const nextSteps = base.filter((_, i) => i !== idx);
+      const next = { ...prev, breakdownSteps: nextSteps };
+      persistAiBundle(next);
+      return next;
+    });
+  }
+
+  function assignBreakdownStepToPlanner(stepIndex) {
+    const idx = Number(stepIndex);
+    if (!Number.isFinite(idx)) return;
+
+    const steps = getCurrentBreakdownSteps();
+    const stepText = steps[idx];
+    if (!stepText) return;
+
+    const minutes = parseStepMinutes(stepText);
+    const startTime = "09:00";
+    const endTime = addMinutesToTimeHHMM(startTime, minutes);
+
+    const due = parseIsoDate(breakdownTaskDate);
+    const today = new Date();
+    const todayIso = formatIsoDate(today);
+
+    let scheduledIso = breakdownTaskDate || todayIso;
+    if (due) {
+      const oneDayBefore = new Date(due.getFullYear(), due.getMonth(), due.getDate());
+      oneDayBefore.setDate(oneDayBefore.getDate() - 1);
+      const candidate = formatIsoDate(oneDayBefore);
+      // Use the day before if it is not in the past; otherwise use the due date.
+      scheduledIso = candidate >= todayIso ? candidate : formatIsoDate(due);
+    }
+
+    const category = categories.includes("Study")
+      ? "Study"
+      : (categories[0] ?? "Study");
+
+    const labelPrefix = breakdownTaskName.trim()
+      ? `${breakdownTaskName.trim()}: `
+      : "";
+
+    createTask({
+      category,
+      label: `${labelPrefix}${String(stepText).trim()}`,
+      description: "",
+      date: scheduledIso,
+      startTime,
+      endTime,
+    });
   }
 
   function removeTask(id) {
@@ -1457,7 +1675,7 @@ export default function DashboardPage() {
                   disabled={isRegenerating}
                   aria-disabled={isRegenerating}
                 >
-                  {isRegenerating ? "Regenerating…" : "Regenerate suggestions"}
+                  {isRegenerating ? "Regenerating…" : "Regenerate Suggestions"}
                 </button>
                 {regenError ? (
                   <div className="text-xs text-zinc-700">{regenError}</div>
@@ -1585,6 +1803,9 @@ export default function DashboardPage() {
                       onChangePriority={setBreakdownPriority}
                       steps={aiBundle.breakdownSteps}
                       showGenerateHint
+                      onEditStep={editBreakdownStep}
+                      onDeleteStep={deleteBreakdownStep}
+                      onAssignStep={assignBreakdownStepToPlanner}
                     />
                   ) : null}
                   {activeTab === "Mood Tracker" ? (
@@ -1617,5 +1838,19 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <React.Suspense
+      fallback={
+        <div className="min-h-screen w-full bg-white p-10 text-sm text-zinc-700">
+          Loading…
+        </div>
+      }
+    >
+      <DashboardPageInner />
+    </React.Suspense>
   );
 }
