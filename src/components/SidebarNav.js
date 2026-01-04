@@ -13,7 +13,7 @@ const NAV_ITEMS = [
 export default function SidebarNav() {
   return (
     <aside className="w-56 border-r border-zinc-300 bg-zinc-50 px-4 py-5">
-      <div className="mb-4 text-sm font-semibold text-zinc-800">MyTime</div>
+      <div className="mb-5 text-xl font-bold tracking-tight text-zinc-900">MyTime</div>
       <nav aria-label="Primary" className="flex flex-col gap-2">
         {NAV_ITEMS.map((item) => {
           const isHash = item.href.startsWith("#");
@@ -38,7 +38,7 @@ export default function SidebarNav() {
 export function SidebarNavWithFooter({ footer }) {
   return (
     <aside className="w-56 border-r border-zinc-300 bg-zinc-50 px-4 py-5">
-      <div className="mb-4 text-sm font-semibold text-zinc-800">MyTime</div>
+      <div className="mb-5 text-xl font-bold tracking-tight text-zinc-900">MyTime</div>
       <nav aria-label="Primary" className="flex flex-col gap-2">
         {NAV_ITEMS.map((item) => {
           const isHash = item.href.startsWith("#");
