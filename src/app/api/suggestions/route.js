@@ -24,6 +24,8 @@ function buildPrompt(payload) {
   const taskCounts = payload?.taskCounts ?? {};
   const topCategory = String(payload?.topCategory ?? "").trim();
   const hasUpcomingAssignment = Boolean(payload?.hasUpcomingAssignment);
+  const nextAssignment = String(payload?.nextAssignment ?? "").trim();
+  const personalNotes = String(payload?.personalNotes ?? "").trim();
 
   const moodLines = moods
     .slice(0, 30)
@@ -42,17 +44,22 @@ function buildPrompt(payload) {
   return [
     "You are a helpful study-skills assistant.",
     "Return ONLY valid JSON in this exact shape (no extra keys, no markdown):",
-    '{"moodCorrelations":["..."],"moodSummary":"...","quickCheck":{"mood":"...","workBalance":"...","tip":"..."}}',
+    '{"moodCorrelations":["..."],"moodSummary":"...","quickCheck":{"mood":"...","workBalance":"...","tip":"..."},"guidedTips":["..."]}',
     "Rules:",
     "- moodCorrelations: 2 to 5 short, data-based bullets.",
     "- moodSummary: ONE sentence, <= 12 words.",
     "- quickCheck.mood/workBalance/tip: each <= 10 words; tip is actionable and supportive.",
+    "- guidedTips: 3 short, friendly tips based on Recent Activity + Personal Notes.",
+    "- guidedTips: each tip <= 14 words; supportive; no medical/diagnostic claims.",
     "Inputs:",
     topCategory ? `- Top category: ${topCategory}` : "- Top category: (unknown)",
     `- Has upcoming assignment session: ${hasUpcomingAssignment ? "yes" : "no"}`,
+    nextAssignment ? `- Next assignment/task: ${nextAssignment}` : "- Next assignment/task: (none)",
     countsLines ? `Task counts:\n${countsLines}` : "Task counts: (none)",
     "Mood timeline:",
     moodLines || "(no entries)",
+    "Personal notes (verbatim):",
+    personalNotes || "(none)",
   ].join("\n");
 }
 
@@ -119,6 +126,7 @@ export async function POST(req) {
         workBalance: String(workBalanceRaw).trim(),
         tip: typeof quick?.tip === "string" ? quick.tip.trim() : "",
       },
+      guidedTips: clampArrayStrings(parsed?.guidedTips, 3),
     });
   } catch {
     return NextResponse.json({ error: "Unexpected server error" }, { status: 500 });

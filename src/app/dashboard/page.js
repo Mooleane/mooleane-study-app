@@ -1138,18 +1138,17 @@ function MoodTrackerTab({
   );
 }
 
-function GuidedNotesTab({ moodSummary, topCategory, hasUpcomingAssignment }) {
-  const recentActivity = [
-    "Mood: Mostly Neutral",
-    "Mostly Studying",
-    "Working on Essay",
-  ];
-
-  const suggestedTips = [
-    "Block out more time for yourself",
-    "Find a hobby to spend time on",
-    "Take breaks between work",
-  ];
+function GuidedNotesTab({ quickCheck, nextAssignment, guidedTips }) {
+  const recentActivity = React.useMemo(() => {
+    const moodLine = `Mood: ${String(quickCheck?.mood || "(No mood entries yet)")}`;
+    const wbLine = `Work Balance: ${String(
+      quickCheck?.workBalance || "(No scheduled tasks yet)"
+    )}`;
+    const assignmentLine = `Assignment: ${String(
+      nextAssignment || "(No upcoming scheduled tasks)"
+    )}`;
+    return [moodLine, wbLine, assignmentLine];
+  }, [quickCheck, nextAssignment]);
 
   const [personalNotes, setPersonalNotes] = React.useState(
     "- I have been feeling a bit bored lately\n- Work is tiring me out"
@@ -1222,20 +1221,17 @@ function GuidedNotesTab({ moodSummary, topCategory, hasUpcomingAssignment }) {
 
       <section className="rounded border border-zinc-300 bg-white p-4">
         <div className="text-sm font-semibold text-zinc-900">Suggested Tips</div>
-        <div className="mt-3 text-sm text-zinc-800">
-          <div>
-            <span className="font-semibold">Mood:</span>{" "}
-            {moodSummary || "(No mood entries yet)"}
+        {Array.isArray(guidedTips) && guidedTips.length > 0 ? (
+          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-zinc-800">
+            {guidedTips.map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+          </ul>
+        ) : (
+          <div className="mt-3 text-sm text-zinc-700">
+            Press <span className="font-semibold">Regenerate Suggestions</span> to get tips.
           </div>
-          <div className="mt-2">
-            <span className="font-semibold">Mostly:</span>{" "}
-            {topCategory || "(No tasks yet)"}
-          </div>
-          <div className="mt-2">
-            <span className="font-semibold">Assignment:</span>{" "}
-            {hasUpcomingAssignment ? "Yes" : "No"}
-          </div>
-        </div>
+        )}
       </section>
     </div>
   );
@@ -1272,6 +1268,7 @@ function DashboardPageInner() {
         workBalance: "A lot of studying",
         tip: "Free more time for yourself",
       },
+      guidedTips: [],
     }),
     []
   );
@@ -1370,6 +1367,9 @@ function DashboardPageInner() {
                 ? storedBundle.quickCheck.tip
                 : prev.quickCheck.tip,
           },
+          guidedTips: Array.isArray(storedBundle.guidedTips)
+            ? storedBundle.guidedTips
+            : prev.guidedTips,
         }));
       }
 
@@ -1508,16 +1508,48 @@ function DashboardPageInner() {
     });
   }, [tasks, nowMs]);
 
+  const nextUpcomingAssignment = React.useMemo(() => {
+    let best = null;
+
+    for (const t of tasks) {
+      if (!t || t.endedAt) continue;
+      const startMs = combineDateAndTimeToMs(t.date, t.startTime);
+      if (startMs == null) continue;
+      if (nowMs >= startMs) continue;
+
+      if (!best || startMs < best.startMs) {
+        best = { startMs, label: String(t.label ?? "").trim() };
+      }
+    }
+
+    return best?.label || "";
+  }, [tasks, nowMs]);
+
   async function regenerateSuggestions() {
     setIsRegenerating(true);
     setRegenError("");
 
     try {
+      let personalNotes = "";
+      try {
+        const storedNotes = safeParseJson(
+          window.localStorage.getItem("mytime.guidedNotes"),
+          null
+        );
+        if (storedNotes && typeof storedNotes === "object" && typeof storedNotes.text === "string") {
+          personalNotes = storedNotes.text;
+        }
+      } catch {
+        // ignore
+      }
+
       const payload = {
         moods,
         topCategory,
         taskCounts,
         hasUpcomingAssignment,
+        nextAssignment: nextUpcomingAssignment,
+        personalNotes,
       };
 
       const res = await fetch("/api/suggestions", {
@@ -1548,6 +1580,7 @@ function DashboardPageInner() {
             aiBundle.quickCheck.workBalance,
           tip: data?.quickCheck?.tip ?? aiBundle.quickCheck.tip,
         },
+        guidedTips: Array.isArray(data?.guidedTips) ? data.guidedTips : aiBundle.guidedTips,
       };
 
       setAiBundle(nextBundle);
@@ -2045,9 +2078,9 @@ function DashboardPageInner() {
                   ) : null}
                   {activeTab === "Guided Notes" ? (
                     <GuidedNotesTab
-                      moodSummary={aiBundle.moodSummary}
-                      topCategory={topCategory}
-                      hasUpcomingAssignment={hasUpcomingAssignment}
+                      quickCheck={aiBundle.quickCheck}
+                      nextAssignment={nextUpcomingAssignment}
+                      guidedTips={aiBundle.guidedTips}
                     />
                   ) : null}
                   {activeTab !== "Study Planner" &&
