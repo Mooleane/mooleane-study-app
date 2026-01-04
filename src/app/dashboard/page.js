@@ -206,11 +206,10 @@ function StudyPlannerTab({
 
   return (
     <div className="space-y-6">
-      <div className="mb-3 text-sm font-semibold text-zinc-900">
-        Scheduled Tasks
-      </div>
-
       <div className="space-y-2">
+        <div className="mb-3 text-sm font-semibold text-zinc-900">
+          Scheduled Tasks
+        </div>
         {sortedTasks.length === 0 ? (
           <div className="rounded border border-zinc-300 bg-white px-3 py-3 text-sm text-zinc-700">
             No scheduled tasks yet.
@@ -704,10 +703,18 @@ function BreakdownWizardTab() {
 
   return (
     <div className="space-y-6">
+      <div className="mb-3 text-sm font-semibold text-zinc-900">
+        Assignment Details
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         <input
+          className="h-9 w-56 rounded border border-zinc-300 bg-white px-2 text-sm text-zinc-800"
+          placeholder="Task Name"
+          aria-label="Task Name"
+        />
+        <input
           className="h-9 w-40 rounded border border-zinc-300 bg-white px-2 text-sm text-zinc-800"
-          placeholder="Task Date"
+          type="date"
           aria-label="Task Date"
         />
         <select
@@ -794,6 +801,9 @@ function MoodTrackerTab() {
 
   return (
     <div className="space-y-6">
+      <div className="mb-3 text-sm font-semibold text-zinc-900">
+        Record Mood
+      </div>
       <div className="rounded border border-zinc-300 bg-white p-4">
         <div className="flex flex-wrap items-center gap-2">
           <select
