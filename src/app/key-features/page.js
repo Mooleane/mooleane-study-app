@@ -1,4 +1,5 @@
 import SidebarNav from "../../components/SidebarNav";
+import Link from "next/link";
 
 export default function KeyFeaturesPage() {
   return (
@@ -24,24 +25,44 @@ export default function KeyFeaturesPage() {
 
                 <div className="mt-4 space-y-4">
                   <p>
-                    <span className="font-semibold">[Study Planner]</span> - Lets
-                    users block out different tasks on a calendar and start
-                    sessions for each one.
+                    <Link
+                      href="/dashboard?tab=study-planner"
+                      className="font-semibold underline"
+                    >
+                      [Study Planner]
+                    </Link>{" "}
+                    - Lets users block out different tasks on a calendar and
+                    start sessions for each one.
                   </p>
                   <p>
-                    <span className="font-semibold">[Breakdown wizard]</span> -
-                    Simplifies large tasks into digestible steps for easier
+                    <Link
+                      href="/dashboard?tab=breakdown-wizard"
+                      className="font-semibold underline"
+                    >
+                      [Breakdown Wizard]
+                    </Link>{" "}
+                    - Simplifies large tasks into digestible steps for easier
                     understanding.
                   </p>
                   <p>
-                    <span className="font-semibold">[Mood Tracker]</span> - Tasks
-                    can be marked with a mood (great, neutral, etc.) which is
-                    visually shown over time.
+                    <Link
+                      href="/dashboard?tab=mood-tracker"
+                      className="font-semibold underline"
+                    >
+                      [Mood Tracker]
+                    </Link>{" "}
+                    - Tasks can be marked with a mood (great, neutral, etc.)
+                    which is visually shown over time.
                   </p>
                   <p>
-                    <span className="font-semibold">[Guided Notes]</span> - Based
-                    on recent activity, notes are generated for resources,
-                    suggested steps, etc.
+                    <Link
+                      href="/dashboard?tab=guided-notes"
+                      className="font-semibold underline"
+                    >
+                      [Guided Notes]
+                    </Link>{" "}
+                    - Based on recent activity, notes are generated for
+                    resources, suggested steps, etc.
                   </p>
                 </div>
               </section>

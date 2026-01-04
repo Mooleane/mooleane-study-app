@@ -1,7 +1,26 @@
 "use client";
 
 import React from "react";
+import { useSearchParams } from "next/navigation";
 import SidebarNav from "../../components/SidebarNav";
+
+const TAB_PARAM_TO_LABEL = {
+  "study-planner": "Study Planner",
+  "breakdown-wizard": "Breakdown wizard",
+  "mood-tracker": "Mood Tracker",
+  "guided-notes": "Guided Notes",
+};
+
+function getInitialTabLabel(tabParam) {
+  if (!tabParam) return null;
+
+  const normalized = String(tabParam).trim().toLowerCase();
+  if (normalized in TAB_PARAM_TO_LABEL) {
+    return TAB_PARAM_TO_LABEL[normalized];
+  }
+
+  return null;
+}
 
 function TabButton({ label, active, onClick }) {
   return (
@@ -363,7 +382,21 @@ export default function DashboardPage() {
     "Mood Tracker",
     "Guided Notes",
   ];
-  const [activeTab, setActiveTab] = React.useState("Study Planner");
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+
+  const [activeTab, setActiveTab] = React.useState(
+    getInitialTabLabel(tabParam) ?? "Study Planner"
+  );
+
+  React.useEffect(() => {
+    const nextTab = getInitialTabLabel(tabParam);
+    if (nextTab && tabs.includes(nextTab)) {
+      setActiveTab(nextTab);
+    }
+    // Only respond to URL query changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabParam]);
 
   return (
     <div className="min-h-screen w-full bg-white text-foreground">
