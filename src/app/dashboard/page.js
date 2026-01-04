@@ -751,6 +751,11 @@ function BreakdownWizardTab({
   onGenerate,
   isGenerating,
   generateError,
+  onImportFile,
+  importedFileName,
+  importedCharCount,
+  isImporting,
+  importError,
   onEditStep,
   onDeleteStep,
   onAssignStep,
@@ -811,8 +816,38 @@ function BreakdownWizardTab({
       </div>
 
       <div className="rounded border border-zinc-300 bg-white p-8">
-        <div className="grid min-h-32 place-items-center rounded border border-zinc-300 bg-zinc-50 px-4 py-10 text-sm font-medium text-zinc-700">
-          Import .txt/.pdf file
+        <div className="grid min-h-32 place-items-center rounded border border-zinc-300 bg-zinc-50 px-4 py-8 text-sm font-medium text-zinc-700">
+          <div className="flex w-full flex-col items-center gap-3">
+            <label className="rounded border border-zinc-400 bg-white px-4 py-2 text-xs font-medium text-zinc-800">
+              <input
+                type="file"
+                accept=".txt,.pdf,text/plain,application/pdf"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  onImportFile?.(f);
+                  e.target.value = "";
+                }}
+              />
+              {isImporting ? "Importing…" : "Import .txt/.pdf file"}
+            </label>
+
+            {importError ? (
+              <div className="text-xs font-normal text-zinc-700">{importError}</div>
+            ) : null}
+
+            {importedFileName ? (
+              <div className="text-xs font-normal text-zinc-700">
+                Imported: <span className="font-semibold">{importedFileName}</span>
+                {importedCharCount ? ` (${importedCharCount} chars)` : ""}
+              </div>
+            ) : (
+              <div className="text-xs font-normal text-zinc-700">
+                Optional: attach reading notes or assignment brief.
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1187,7 +1222,7 @@ function DashboardPageInner() {
       moodSummary: "",
       quickCheck: {
         mood: "Mostly Neutral",
-        balance: "A lot of studying",
+        workBalance: "A lot of studying",
         tip: "Free more time for yourself",
       },
     }),
@@ -1197,6 +1232,18 @@ function DashboardPageInner() {
   const [aiBundle, setAiBundle] = React.useState(aiFallback);
 
   const [breakdownSteps, setBreakdownSteps] = React.useState([]);
+  const [breakdownContext, setBreakdownContext] = React.useState({
+    taskName: "",
+    taskDate: "",
+    priority: "",
+  });
+  const [breakdownImportedText, setBreakdownImportedText] = React.useState("");
+  const [breakdownImportedFileName, setBreakdownImportedFileName] =
+    React.useState("");
+  const [breakdownImportedCharCount, setBreakdownImportedCharCount] =
+    React.useState(0);
+  const [isImportingBreakdown, setIsImportingBreakdown] = React.useState(false);
+  const [breakdownImportError, setBreakdownImportError] = React.useState("");
   const [isGeneratingBreakdown, setIsGeneratingBreakdown] = React.useState(false);
   const [breakdownError, setBreakdownError] = React.useState("");
 
@@ -1265,10 +1312,12 @@ function DashboardPageInner() {
               typeof storedBundle?.quickCheck?.mood === "string"
                 ? storedBundle.quickCheck.mood
                 : prev.quickCheck.mood,
-            balance:
-              typeof storedBundle?.quickCheck?.balance === "string"
-                ? storedBundle.quickCheck.balance
-                : prev.quickCheck.balance,
+            workBalance:
+              typeof storedBundle?.quickCheck?.workBalance === "string"
+                ? storedBundle.quickCheck.workBalance
+                : typeof storedBundle?.quickCheck?.balance === "string"
+                  ? storedBundle.quickCheck.balance
+                  : prev.quickCheck.workBalance,
             tip:
               typeof storedBundle?.quickCheck?.tip === "string"
                 ? storedBundle.quickCheck.tip
@@ -1282,9 +1331,18 @@ function DashboardPageInner() {
         null
       );
       if (storedBreakdown && typeof storedBreakdown === "object") {
-        const maybe = storedBreakdown.steps;
-        if (Array.isArray(maybe) && maybe.length > 0) {
-          setBreakdownSteps(maybe);
+        const maybeSteps = storedBreakdown.steps;
+        if (Array.isArray(maybeSteps) && maybeSteps.length > 0) {
+          setBreakdownSteps(maybeSteps);
+        }
+
+        const maybeCtx = storedBreakdown.context;
+        if (maybeCtx && typeof maybeCtx === "object") {
+          setBreakdownContext({
+            taskName: typeof maybeCtx.taskName === "string" ? maybeCtx.taskName : "",
+            taskDate: typeof maybeCtx.taskDate === "string" ? maybeCtx.taskDate : "",
+            priority: typeof maybeCtx.priority === "string" ? maybeCtx.priority : "",
+          });
         }
       }
     } catch {
@@ -1437,7 +1495,10 @@ function DashboardPageInner() {
             : aiBundle.moodSummary,
         quickCheck: {
           mood: data?.quickCheck?.mood ?? aiBundle.quickCheck.mood,
-          balance: data?.quickCheck?.balance ?? aiBundle.quickCheck.balance,
+          workBalance:
+            data?.quickCheck?.workBalance ??
+            data?.quickCheck?.balance ??
+            aiBundle.quickCheck.workBalance,
           tip: data?.quickCheck?.tip ?? aiBundle.quickCheck.tip,
         },
       };
@@ -1470,6 +1531,8 @@ function DashboardPageInner() {
           taskName: trimmedName,
           taskDate: breakdownTaskDate.trim(),
           priority: breakdownPriority.trim(),
+          contextText: breakdownImportedText,
+          contextFileName: breakdownImportedFileName,
         }),
       });
 
@@ -1482,10 +1545,17 @@ function DashboardPageInner() {
       const finalSteps = nextSteps.length > 0 ? nextSteps : DEFAULT_BREAKDOWN_STEPS;
       setBreakdownSteps(finalSteps);
 
+      const ctx = {
+        taskName: trimmedName,
+        taskDate: breakdownTaskDate.trim(),
+        priority: breakdownPriority.trim(),
+      };
+      setBreakdownContext(ctx);
+
       try {
         window.localStorage.setItem(
           BREAKDOWN_KEY,
-          JSON.stringify({ steps: finalSteps })
+          JSON.stringify({ steps: finalSteps, context: ctx })
         );
       } catch {
         // ignore
@@ -1494,6 +1564,44 @@ function DashboardPageInner() {
       setBreakdownError(e?.message || "Failed to generate steps.");
     } finally {
       setIsGeneratingBreakdown(false);
+    }
+  }
+
+  async function importBreakdownFile(file) {
+    if (!file) return;
+
+    setIsImportingBreakdown(true);
+    setBreakdownImportError("");
+
+    try {
+      const form = new FormData();
+      form.append("file", file);
+
+      const res = await fetch("/api/extract", {
+        method: "POST",
+        body: form,
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to import file.");
+      }
+
+      const text = typeof data?.text === "string" ? data.text : "";
+      if (!text.trim()) {
+        throw new Error("No text found in the uploaded file.");
+      }
+
+      setBreakdownImportedText(text);
+      setBreakdownImportedFileName(typeof data?.fileName === "string" ? data.fileName : file.name);
+      setBreakdownImportedCharCount(Number(data?.charCount) || text.length);
+    } catch (e) {
+      setBreakdownImportError(e?.message || "Failed to import file.");
+      setBreakdownImportedText("");
+      setBreakdownImportedFileName("");
+      setBreakdownImportedCharCount(0);
+    } finally {
+      setIsImportingBreakdown(false);
     }
   }
 
@@ -1596,7 +1704,7 @@ function DashboardPageInner() {
       try {
         window.localStorage.setItem(
           BREAKDOWN_KEY,
-          JSON.stringify({ steps: nextSteps })
+          JSON.stringify({ steps: nextSteps, context: breakdownContext })
         );
       } catch {
         // ignore
@@ -1617,7 +1725,7 @@ function DashboardPageInner() {
       try {
         window.localStorage.setItem(
           BREAKDOWN_KEY,
-          JSON.stringify({ steps: nextSteps })
+          JSON.stringify({ steps: nextSteps, context: breakdownContext })
         );
       } catch {
         // ignore
@@ -1638,26 +1746,23 @@ function DashboardPageInner() {
     const startTime = "09:00";
     const endTime = addMinutesToTimeHHMM(startTime, minutes);
 
-    const due = parseIsoDate(breakdownTaskDate);
-    const today = new Date();
-    const todayIso = formatIsoDate(today);
+    const snapshotTaskDate =
+      String(breakdownContext?.taskDate ?? "").trim() ||
+      String(breakdownTaskDate ?? "").trim();
+    const snapshotTaskName =
+      String(breakdownContext?.taskName ?? "").trim() ||
+      String(breakdownTaskName ?? "").trim();
 
-    let scheduledIso = breakdownTaskDate || todayIso;
-    if (due) {
-      const oneDayBefore = new Date(due.getFullYear(), due.getMonth(), due.getDate());
-      oneDayBefore.setDate(oneDayBefore.getDate() - 1);
-      const candidate = formatIsoDate(oneDayBefore);
-      // Use the day before if it is not in the past; otherwise use the due date.
-      scheduledIso = candidate >= todayIso ? candidate : formatIsoDate(due);
-    }
+    const todayIso = formatIsoDate(new Date());
+    const due = parseIsoDate(snapshotTaskDate);
+    // Assign directly on the assignment completion date (Task Date).
+    const scheduledIso = due ? snapshotTaskDate : todayIso;
 
     const category = categories.includes("Study")
       ? "Study"
       : (categories[0] ?? "Study");
 
-    const labelPrefix = breakdownTaskName.trim()
-      ? `${breakdownTaskName.trim()}: `
-      : "";
+    const labelPrefix = snapshotTaskName ? `${snapshotTaskName}: ` : "";
 
     createTask({
       category,
@@ -1823,7 +1928,7 @@ function DashboardPageInner() {
                       <span className="font-semibold">Mood:</span> {aiBundle.quickCheck.mood}
                     </p>
                     <p className="mt-2">
-                      <span className="font-semibold">Balance:</span> {aiBundle.quickCheck.balance}
+                      <span className="font-semibold">Work Balance:</span> {aiBundle.quickCheck.workBalance}
                     </p>
                     <p className="mt-2">
                       <span className="font-semibold">Tip:</span> {aiBundle.quickCheck.tip}
@@ -1873,6 +1978,11 @@ function DashboardPageInner() {
                       onGenerate={generateBreakdownSteps}
                       isGenerating={isGeneratingBreakdown}
                       generateError={breakdownError}
+                      onImportFile={importBreakdownFile}
+                      importedFileName={breakdownImportedFileName}
+                      importedCharCount={breakdownImportedCharCount}
+                      isImporting={isImportingBreakdown}
+                      importError={breakdownImportError}
                       onEditStep={editBreakdownStep}
                       onDeleteStep={deleteBreakdownStep}
                       onAssignStep={assignBreakdownStepToPlanner}

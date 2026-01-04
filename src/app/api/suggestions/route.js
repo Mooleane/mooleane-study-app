@@ -42,11 +42,11 @@ function buildPrompt(payload) {
   return [
     "You are a helpful study-skills assistant.",
     "Return ONLY valid JSON in this exact shape (no extra keys, no markdown):",
-    '{"moodCorrelations":["..."],"moodSummary":"...","quickCheck":{"mood":"...","balance":"...","tip":"..."}}',
+    '{"moodCorrelations":["..."],"moodSummary":"...","quickCheck":{"mood":"...","workBalance":"...","tip":"..."}}',
     "Rules:",
     "- moodCorrelations: 2 to 5 short, data-based bullets.",
     "- moodSummary: ONE sentence, <= 12 words.",
-    "- quickCheck.mood/balance/tip: each <= 10 words; tip is actionable and supportive.",
+    "- quickCheck.mood/workBalance/tip: each <= 10 words; tip is actionable and supportive.",
     "Inputs:",
     topCategory ? `- Top category: ${topCategory}` : "- Top category: (unknown)",
     `- Has upcoming assignment session: ${hasUpcomingAssignment ? "yes" : "no"}`,
@@ -102,6 +102,12 @@ export async function POST(req) {
     const parsed = safeJsonParse(content) ?? {};
 
     const quick = parsed?.quickCheck ?? {};
+    const workBalanceRaw =
+      typeof quick?.workBalance === "string"
+        ? quick.workBalance
+        : typeof quick?.balance === "string"
+          ? quick.balance
+          : "";
 
     return NextResponse.json({
       generatedAt: Date.now(),
@@ -110,7 +116,7 @@ export async function POST(req) {
         typeof parsed?.moodSummary === "string" ? parsed.moodSummary.trim() : "",
       quickCheck: {
         mood: typeof quick?.mood === "string" ? quick.mood.trim() : "",
-        balance: typeof quick?.balance === "string" ? quick.balance.trim() : "",
+        workBalance: String(workBalanceRaw).trim(),
         tip: typeof quick?.tip === "string" ? quick.tip.trim() : "",
       },
     });

@@ -2,10 +2,16 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-function buildPrompt({ taskName, taskDate, priority }) {
+function buildPrompt({ taskName, taskDate, priority, contextText, contextFileName }) {
   const safeName = String(taskName ?? "").trim();
   const safeDate = String(taskDate ?? "").trim();
   const safePriority = String(priority ?? "").trim();
+  const safeContext = String(contextText ?? "").trim();
+  const safeContextFileName = String(contextFileName ?? "").trim();
+  const contextBlock = safeContext ? safeContext.slice(0, 8000) : "";
+  const contextLabel = safeContextFileName
+    ? `Context from attached file (${safeContextFileName}):`
+    : "Context from attached file:";
 
   return [
     "You are a helpful study-planning assistant.",
@@ -20,6 +26,8 @@ function buildPrompt({ taskName, taskDate, priority }) {
     safeName ? `- Name: ${safeName}` : "- Name: (not provided)",
     safeDate ? `- Due/Date: ${safeDate}` : "- Due/Date: (not provided)",
     safePriority ? `- Priority: ${safePriority}` : "- Priority: (not provided)",
+    contextBlock ? contextLabel : "",
+    contextBlock ? contextBlock : "",
   ].join("\n");
 }
 
@@ -45,7 +53,7 @@ function tryParseSteps(content) {
 export async function POST(req) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { taskName, taskDate, priority } = body ?? {};
+    const { taskName, taskDate, priority, contextText, contextFileName } = body ?? {};
 
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
@@ -69,7 +77,10 @@ export async function POST(req) {
         max_tokens: 220,
         messages: [
           { role: "system", content: "You are a concise planning assistant." },
-          { role: "user", content: buildPrompt({ taskName, taskDate, priority }) },
+          {
+            role: "user",
+            content: buildPrompt({ taskName, taskDate, priority, contextText, contextFileName }),
+          },
         ],
       }),
     });
