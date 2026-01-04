@@ -310,6 +310,52 @@ function MoodTrackerTab() {
   );
 }
 
+function GuidedNotesTab() {
+  const recentActivity = [
+    "Mood: Mostly Neutral",
+    "Mostly Studying",
+    "Working on Essay",
+  ];
+
+  const suggestedTips = [
+    "Block out more time for yourself",
+    "Find a hobby to spend time on",
+    "Take breaks between work",
+  ];
+
+  return (
+    <div className="space-y-4">
+      <section className="rounded border border-zinc-300 bg-white p-4">
+        <div className="text-sm font-semibold text-zinc-900">Recent Activity</div>
+        <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-zinc-800">
+          {recentActivity.map((a) => (
+            <li key={a}>{a}</li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="rounded border border-zinc-300 bg-white p-4">
+        <div className="text-sm font-semibold text-zinc-900">Personal Notes</div>
+        <div className="mt-3 rounded border border-zinc-300 bg-white p-4">
+          <div className="text-sm text-zinc-800">
+            <div>- I have been feeling a bit bored lately</div>
+            <div>- Work is tiring me out</div>
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded border border-zinc-300 bg-white p-4">
+        <div className="text-sm font-semibold text-zinc-900">Suggested Tips</div>
+        <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-zinc-800">
+          {suggestedTips.map((t) => (
+            <li key={t}>{t}</li>
+          ))}
+        </ul>
+      </section>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const tabs = [
     "Study Planner",
@@ -391,9 +437,11 @@ export default function DashboardPage() {
                     <BreakdownWizardTab />
                   ) : null}
                   {activeTab === "Mood Tracker" ? <MoodTrackerTab /> : null}
+                  {activeTab === "Guided Notes" ? <GuidedNotesTab /> : null}
                   {activeTab !== "Study Planner" &&
                   activeTab !== "Breakdown wizard" &&
-                  activeTab !== "Mood Tracker" ? (
+                  activeTab !== "Mood Tracker" &&
+                  activeTab !== "Guided Notes" ? (
                     <div className="py-12 text-center text-lg font-semibold text-zinc-800">
                       [Tab Content Shown]
                     </div>
