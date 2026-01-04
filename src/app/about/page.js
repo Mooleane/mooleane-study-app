@@ -87,7 +87,15 @@ export default function AboutPage() {
 
                 <div className="mt-4">
                   <h3 className="font-semibold text-zinc-900">
-                    Existing Solution 1 - Google Calendar
+                    Existing Solution 1 -{" "}
+                    <a
+                      href="https://calendar.google.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline"
+                    >
+                      Google Calendar
+                    </a>
                   </h3>
                   <ul className="mt-2 list-disc pl-5">
                     <li>
@@ -107,7 +115,15 @@ export default function AboutPage() {
 
                 <div className="mt-6">
                   <h3 className="font-semibold text-zinc-900">
-                    Existing Solution 2 - Daylio
+                    Existing Solution 2 -{" "}
+                    <a
+                      href="https://daylio.net/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline"
+                    >
+                      Daylio
+                    </a>
                   </h3>
                   <ul className="mt-2 list-disc pl-5">
                     <li>
@@ -127,7 +143,15 @@ export default function AboutPage() {
 
                 <div className="mt-6">
                   <h3 className="font-semibold text-zinc-900">
-                    Existing Solution 3 - Microsoft To Do
+                    Existing Solution 3 -{" "}
+                    <a
+                      href="https://to-do.office.com/tasks/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline"
+                    >
+                      Microsoft To Do
+                    </a>
                   </h3>
                   <ul className="mt-2 list-disc pl-5">
                     <li>
